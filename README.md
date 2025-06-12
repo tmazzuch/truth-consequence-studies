@@ -6,4 +6,4 @@ This folder contains the experiments for these studies:
 - Supplementary Study 1
 - Study 3
 
-To view these studies, please open the file called [index.html](index.html). Then follow instructions from there.
+To view these studies, please open the file called `index.html` in your web browser. Then follow instructions from there.
