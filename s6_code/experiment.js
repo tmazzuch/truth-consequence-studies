@@ -827,4 +827,4 @@ experiment.push(
     // back_to_prolific
 )
 
-jsPsych.simulate(experiment)
+jsPsych.run(experiment)
