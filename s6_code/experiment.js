@@ -1,21 +1,17 @@
 // initialize jsPsych
-const jsPsych = initJsPsych({
-    on_finish: function() {
-        jsPsych.data.displayData()
-        jsPsych.data.get().localSave('csv', `${subject_id}.csv`)
-    }
-})
+const jsPsych = initJsPsych({})
 
-// data variables
+// subject level constants
 const subject_id = jsPsych.randomization.randomID(10);
-
 const url_pid = jsPsych.data.getURLVariable("PROLIFIC_PID")
+
+const do_reporter = Math.random() > 0.5 ? true : false
 
 jsPsych.data.addProperties({
     subject_id: subject_id, 
-    prolific_id: url_pid
+    prolific_id: url_pid,
+    did_reporter: do_reporter
 })
-
 
 // experiment variables
 var earnings = 0
@@ -62,7 +58,6 @@ var reporter_count = 6
 
 const dvs = {
     manip_check: ["Lower", "They were equal", "Higher"],
-    truth_bn: ["False", "True"],
     truth_lk: ["1", "2", "3", "4", "5", "6", "7"],
 }
 
@@ -89,6 +84,24 @@ const consent = {
     },
     data: {
         type_of_trial: "consent"
+    }
+}
+
+// no ai agreement
+const no_ai = {
+    type: jsPsychSurveyMultiSelect,
+    preamble: no_ai_preamble,
+    questions: [
+        {
+            prompt: "",
+            options: ["I agree not to use AI for any part of this study."]
+        }
+    ],
+    on_finish: function(data) {
+        data.agree_no_ai = data.response.Q0.length == 1
+    },
+    data: {
+        type_of_trial: "no_ai"
     }
 }
 
@@ -126,20 +139,77 @@ const first_instructions = {
     pages: function() {
         var instructions_pages = []
 
-        instructions_pages.push(
-            instructions_page1,
-            instructions_page2,
-            instructions_page3,
-            instructions_page4,
-            instructions_page5
-        )
+        if (do_reporter) {
+            instructions_pages.push(
+                instructions_page1,
+                instructions_page2,
+                instructions_page3,
+                instructions_page4,
+                instructions_page5
+            )
+        } else {
+            instructions_pages.push(
+                instructions_page1_norep,
+                instructions_page2_norep,
+                instructions_page3_norep,
+                instructions_page4_norep,
+                instructions_page6_norep,
+                instructions_page7,
+                instructions_page8,
+                instructions_page9,
+                instructions_page10,
+                instructions_page11,
+                instructions_page12,
+                instructions_page13,
+                instructions_page14
+            )
+        }
 
         return instructions_pages
     },
     allow_keys: false,
     show_clickable_nav: true,
+    show_page_number: true,
     data: {
         type_of_trial: "instructions"
+    },
+    on_load: function() {
+        document.getElementById("jspsych-content").style.margin = "50px auto"
+        
+        // Select the node that you want to observe
+        const targetNode = document.getElementById('jspsych-content')
+        
+        // Options for the observer (which mutations to observe)
+        const config = { attributes: true, childList: true, subtree: true, characterData: true }
+        
+        // Callback function to execute when mutations are observed
+        const callback = function(mutationsList, observer) {
+            if (document.querySelector(".jspsych-instructions-pagenum")) {
+                if (!(typeof change_inst_box === "undefined")) {
+                    clearTimeout(change_inst_box)
+                }
+
+                if (document.querySelector(".jspsych-instructions-pagenum").textContent == "Page 11/13" && !document.querySelector(".number-line")) {
+                    setTimeout(function() {
+                        document.getElementById("wheel").style.transition = "rotate 4000ms ease-out"
+                        document.getElementById("wheel").style.rotate = `${num_spins * 360 + 340}deg`
+                    }, 1)
+
+                    change_inst_box = setTimeout(function() {
+                        document.querySelector(".instructions-box").outerHTML = instructions_page12_full_box
+                    }, 4001)
+                }
+            } else {
+                // Stop observing
+                observer.disconnect()
+            }
+        }
+        
+        // Create an observer instance linked to the callback function
+        const observer = new MutationObserver(callback)
+        
+        // Start observing the target node for configured mutations
+        observer.observe(targetNode, config)
     }
 }
 
@@ -213,7 +283,7 @@ const comprehension = {
     preamble: `
         We know there were a lot of rules for this game. 
         To make sure you remember them, please answer the following questions. 
-        If you need to reference the rules, you can find them <a href="instructions.html" target="_blank">here</a>.
+        If you need to reference the rules, you can find them <a href="instructions.html?do_reporter=${do_reporter}" target="_blank">here</a>.
     `,
     questions: [
         {
@@ -565,7 +635,6 @@ const see_outcome = {
         update_pot(jsPsych.timelineVariable("buyin"), jsPsych.timelineVariable("bet"), jsPsych.timelineVariable("outcome"))
 
         data.manip_check = data.response.manip_check
-        data.truth_bn = data.response.truth_bn
         data.truth_lk = data.response.truth_lk
         data.minimum = current_minimum
         data.report = current_report
@@ -599,7 +668,6 @@ const see_outcome_prac = {
         update_pot(jsPsych.timelineVariable("buyin"), jsPsych.timelineVariable("bet"), jsPsych.timelineVariable("outcome"))
 
         data.manip_check = data.response.manip_check
-        data.truth_bn = data.response.truth_bn
         data.truth_lk = data.response.truth_lk
         data.minimum = current_minimum
         data.report = current_report
@@ -718,7 +786,7 @@ const feedback = {
     html: feedback_questions,
     on_finish: function(data) {
         // populate data
-        data.understand = data.response.understandable
+        data.understand = data.response.understand
         data.confusing = data.response.confusing
         data.annoying = data.response.annoying
         data.issues = data.response.issues
@@ -751,6 +819,23 @@ const less_than_half = {
     }
 }
 
+const truth_survey = {
+    type: jsPsychSurveyHtmlForm,
+    preamble: "Please answer the following questions honestly.",
+    html: truth_survey_specific_questions,
+    on_finish: function(data) {
+        // populate data
+        data.self_cons = data.response.self_cons
+        data.other_cons = data.response.others_cons
+        data.should_cons = data.response.should_cons
+        data.should_cons_general = data.response.should_cons_general
+    },
+    data: {
+        type_of_trial: "truth_survey",
+        subject_id: subject_id
+    }
+}
+
 const back_to_prolific = {
     type: jsPsychHtmlButtonResponse,
     stimulus: `
@@ -768,7 +853,7 @@ const back_to_prolific = {
     },
     on_finish: function() {
         jsPsych.endExperiment(
-            "Thank you for your participation!.<br>Your completion code is C1F07MCQ"
+            "Thank you for your participation!<br>Your completion code is C1F07MCQ"
         )
     },
     data: {
@@ -803,28 +888,46 @@ const save_data_final = {
 var experiment = []
 
 experiment.push(
-    // consent,
-    // prolific_id,
-    first_instructions,
-    begin_reporter,
-    reporter_task_prac,
-    second_instructions,
+    consent,
+    no_ai,
+    prolific_id,
+    first_instructions
+)
+
+if (do_reporter) {
+    experiment.push(
+        begin_reporter,
+        reporter_task_prac,
+        second_instructions
+    )
+}
+
+experiment.push(
     decider_task_prac,
-    // comprehension_loop,
-    move_to_experiment_reporter,
-    begin_reporter,
-    reporter_task,
+    comprehension_loop
+)
+
+if (do_reporter) {
+    experiment.push(
+        move_to_experiment_reporter,
+        begin_reporter,
+        reporter_task
+    )
+}
+
+experiment.push(
     attention,
     move_to_experiment_decider,
     decider_task,
-    // save_data_decider,
+    save_data_decider,
     bonus_report,
+    truth_survey,
     less_than_half,
     demographics,
     debrief,
     feedback,
-    // save_data_final,
-    // back_to_prolific
+    save_data_final,
+    back_to_prolific
 )
 
 jsPsych.run(experiment)
